@@ -172,11 +172,11 @@ function initializeTypingEffect() {
     if (!typingText) return;
     
     const texts = [
-        'made by @cenfoire',
-        'creative developer',
-        'digital minimalist',
-        'code architect',
-        'pixel perfectionist'
+        'made by @43cs',
+        'not socreative developer',
+        'minimalist',
+        'c++ programmer',
+        'a chill guy'
     ];
     
     let textIndex = 0;
@@ -310,10 +310,10 @@ function updateDiscordUI(userData) {
     }
     
     const statusTexts = {
-        'online': 'En ligne - Disponible pour des projets',
-        'idle': 'Absent - Répondra plus tard',
-        'dnd': 'Ne pas déranger - Occupé',
-        'offline': 'Hors ligne - Laissez un message'
+        'online': 'online - prob working on something',
+        'idle': 'Absent - but will respond later',
+        'dnd': 'Do Not Disturb - please dont.',
+        'offline': 'Offline - leave a message'
     };
     
     if (mainStatusText) {
