@@ -81,6 +81,7 @@ function initializeEntryPage() {
     const audioIcon = document.getElementById('audio-icon');
     
     backgroundMusic = document.getElementById('background-music');
+    backgroundMusic.volume = 0.8; // Set volume to 80%
     
     audioControl.addEventListener('click', function(e) {
         e.stopPropagation();
@@ -227,17 +228,45 @@ function updateLastSeen() {
     lastSeenElement.textContent = `Last seen: ${timeString}`;
 }
 
+function connectWebSocket() {
+    const socket = new WebSocket('wss://api.lanyard.rest/socket');
+    
+    socket.onopen = () => {
+        socket.send(JSON.stringify({
+            op: 2,
+            d: {
+                subscribe_to_id: CONFIG.DISCORD_USER_ID
+            }
+        }));
+    };
+
+    socket.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        if (data.t === 'PRESENCE_UPDATE' && data.d) {
+            updateDiscordUI(data.d);
+        }
+    };
+
+    socket.onclose = () => {
+        setTimeout(connectWebSocket, 1000);
+    };
+}
+
 async function updateDiscordStatus() {
     try {
+        // Initial fetch
         const response = await fetch(`https://api.lanyard.rest/v1/users/${CONFIG.DISCORD_USER_ID}`);
         const data = await response.json();
         
         if (data.success && data.data) {
-            const user = data.data;
-            updateDiscordUI(user);
+            updateDiscordUI(data.data);
         }
+        
+        // Set up WebSocket for real-time updates
+        connectWebSocket();
     } catch (error) {
-        console.log('Erreur lors de la récupération des données Discord:', error);
+        console.log('Error fetching Discord data:', error);
+        setTimeout(updateDiscordStatus, 5000);
     }
 }
 
@@ -251,17 +280,21 @@ function updateDiscordUI(userData) {
     const mainStatusDot = document.getElementById('main-status-dot');
     const mainStatusText = document.getElementById('main-status-text');
     
-    if (avatar && userData.discord_user) {
-        const avatarUrl = userData.discord_user.avatar 
-            ? `https://cdn.discordapp.com/avatars/${userData.discord_user.id}/${userData.discord_user.avatar}?size=128`
+    if (avatar && (userData.discord_user || userData.user)) {
+        const user = userData.discord_user || userData.user;
+        const avatarUrl = user.avatar 
+            ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}?size=128`
             : `https://cdn.discordapp.com/embed/avatars/0.png`;
         
-        avatar.src = avatarUrl;
-        if (mainAvatar) mainAvatar.src = avatarUrl;
+        if (avatarUrl !== avatar.src) {
+            avatar.src = avatarUrl;
+            if (mainAvatar) mainAvatar.src = avatarUrl;
+        }
     }
     
-    if (username && userData.discord_user) {
-        username.textContent = userData.discord_user.global_name || userData.discord_user.username;
+    if (username && (userData.discord_user || userData.user)) {
+        const user = userData.discord_user || userData.user;
+        username.textContent = user.global_name || user.username || '43cs';
     }
     
     const status = userData.discord_status || 'offline';
