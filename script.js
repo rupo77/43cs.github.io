@@ -1,495 +1,514 @@
-document.addEventListener('DOMContentLoaded', function() {
-    const CONFIG = {
-        DISCORD_USER_ID: '200207310625177602',
-        SPOTIFY_CLIENT_ID: 'dd3631db64a24da8a1d5bba2ea489a6e',
-        DISCORD_BOT_TOKEN: null,
-        UPDATE_INTERVAL: 30000,
-        SPOTIFY_UPDATE_INTERVAL: 5000
-    };
-    
-    const cursor = document.querySelector('.cursor');
-    if (cursor) {
-        document.addEventListener('mousemove', (e) => {
-            cursor.style.left = e.clientX + 'px';
-            cursor.style.top = e.clientY + 'px';
-        });
-        
-        const hoverElements = document.querySelectorAll('a, .profile-img');
-        hoverElements.forEach(element => {
-            element.addEventListener('mouseenter', () => {
-                cursor.style.width = '16px';
-                cursor.style.height = '16px';
-            });
-            
-            element.addEventListener('mouseleave', () => {
-                cursor.style.width = '8px';
-                cursor.style.height = '8px';
-            });
-        });
-    }
-    
-    const typingText = document.querySelector('.typing-text');
-    if (typingText) {
-        const text = 'made by @cenfoire or @7331 on vacban';
-        let index = 0;
-        
-        function typeWriter() {
-            if (index < text.length) {
-                typingText.textContent = text.slice(0, index + 1);
-                index++;
-                setTimeout(typeWriter, 100);
-            } else {
-                setTimeout(() => {
-                    index = 0;
-                    typingText.textContent = '';
-                    setTimeout(typeWriter, 2000);
-                }, 4000);
-            }
-        }
-        
-        setTimeout(typeWriter, 1000);
-    }
-    
-    async function updateDiscordStatus() {
-        console.log('🔄 Mise à jour du statut Discord...');
-        
-        try {
-            const lanyardResponse = await fetch(`https://api.lanyard.rest/v1/users/${CONFIG.DISCORD_USER_ID}`);
-            
-            if (lanyardResponse.ok) {
-                const lanyardData = await lanyardResponse.json();
-                console.log('✅ Données Lanyard reçues:', lanyardData);
-                
-                if (lanyardData.success && lanyardData.data) {
-                    updateDiscordUI(lanyardData.data);
-                    return;
-                }
-            }
-            
-            const lookupResponse = await fetch(`https://discordlookup.mesalytic.moe/v1/user/${CONFIG.DISCORD_USER_ID}`);
-            
-            if (lookupResponse.ok) {
-                const lookupData = await lookupResponse.json();
-                console.log('✅ Données Discord Lookup reçues:', lookupData);
-                updateDiscordUIFromLookup(lookupData);
-                return;
-            }
-            
-            const discordResponse = await fetch(`https://discord.com/api/v10/users/${CONFIG.DISCORD_USER_ID}`);
-            
-            if (discordResponse.ok) {
-                const discordData = await discordResponse.json();
-                console.log('✅ Données Discord API reçues:', discordData);
-                updateDiscordUIFromAPI(discordData);
-                return;
-            }
-            
-        } catch (error) {
-            console.error('❌ Erreur lors de la récupération des données Discord:', error);
-        }
-        
-        updateDiscordOffline();
-    }
-    
-    function updateDiscordUI(userData) {
-        if (window.lastDiscordUpdate && Date.now() - window.lastDiscordUpdate < 5000) {
-            return;
-        }
-        window.lastDiscordUpdate = Date.now();
-        
-        console.log('🎨 Mise à jour UI Discord avec Lanyard:', userData);
-        
-        const avatar = document.getElementById('discord-avatar');
-        const mainAvatar = document.getElementById('main-avatar');
-        const username = document.getElementById('discord-username');
-        const status = document.getElementById('discord-status');
-        const activity = document.getElementById('discord-activity');
-        const activityImage = document.getElementById('activity-image');
-        
-        if (userData.discord_user) {
-            const avatarUrl = userData.discord_user.avatar 
-                ? `https://cdn.discordapp.com/avatars/${userData.discord_user.id}/${userData.discord_user.avatar}.png?size=128`
-                : `https://cdn.discordapp.com/embed/avatars/${(parseInt(userData.discord_user.discriminator) || 0) % 5}.png`;
-            
-            if (avatar) avatar.src = avatarUrl;
-            if (mainAvatar) mainAvatar.src = avatarUrl;
-            
-            const discordUsername = userData.discord_user.username || 'cenfoire';
-            if (username) username.textContent = '@' + discordUsername;
-            
-            currentDiscordHandle = '@' + discordUsername;
-            
-            if (status) {
-                const statusClass = userData.discord_status || 'offline';
-                status.className = `status-indicator ${statusClass}`;
-            }
-            
-            if (activity) {
-                if (userData.activities && userData.activities.length > 0) {
-                    const filteredActivities = userData.activities.filter(a => 
-                        a.type !== 4 &&
-                        a.name !== 'Spotify' &&
-                        !a.name.toLowerCase().includes('spotify')
-                    );
-                    
-                    if (filteredActivities.length > 0) {
-                        const currentActivity = filteredActivities[0];
-                        
-                        let activityHTML = '';
-                        
-                        switch (currentActivity.type) {
-                            case 0:
-                                activityHTML = `
-                                    <span class="activity-text">
-                                        🎮 Joue à ${currentActivity.name}
-                                        ${currentActivity.details ? `<br><small>${currentActivity.details}</small>` : ''}
-                                        ${currentActivity.state ? `<br><small>${currentActivity.state}</small>` : ''}
-                                    </span>
-                                `;
-                                if (activityImage && currentActivity.assets) {
-                                    if (currentActivity.assets.large_image) {
-                                        const imageUrl = currentActivity.assets.large_image.startsWith('mp:')
-                                            ? `https://media.discordapp.net/${currentActivity.assets.large_image.slice(3)}`
-                                            : `https://cdn.discordapp.com/app-assets/${currentActivity.application_id}/${currentActivity.assets.large_image}.png`;
-                                        activityImage.src = imageUrl;
-                                        activityImage.style.display = 'block';
-                                    } else {
-                                        activityImage.style.display = 'none';
-                                    }
-                                }
-                                break;
-                            case 1:
-                                activityHTML = `
-                                    <span class="activity-text">
-                                        🔴 Stream ${currentActivity.name}
-                                        ${currentActivity.details ? `<br><small>${currentActivity.details}</small>` : ''}
-                                    </span>
-                                `;
-                                break;
-                            case 2:
-                                activityHTML = `
-                                    <span class="activity-text">
-                                        🎵 Écoute ${currentActivity.name}
-                                        ${currentActivity.details ? `<br><small>${currentActivity.details}</small>` : ''}
-                                        ${currentActivity.state ? `<br><small>par ${currentActivity.state}</small>` : ''}
-                                    </span>
-                                `;
-                                break;
-                            case 3:
-                                activityHTML = `
-                                    <span class="activity-text">
-                                        📺 Regarde ${currentActivity.name}
-                                        ${currentActivity.details ? `<br><small>${currentActivity.details}</small>` : ''}
-                                    </span>
-                                `;
-                                break;
-                            default:
-                                activityHTML = `
-                                    <span class="activity-text">
-                                        ${currentActivity.name}
-                                        ${currentActivity.details ? `<br><small>${currentActivity.details}</small>` : ''}
-                                    </span>
-                                `;
-                        }
-                        
-                        activity.innerHTML = activityHTML;
-                    } else {
-                        activity.innerHTML = '<span class="activity-text">Aucune activité</span>';
-                        if (activityImage) activityImage.style.display = 'none';
-                    }
-                } else {
-                    activity.innerHTML = '<span class="activity-text">Aucune activité</span>';
-                    if (activityImage) activityImage.style.display = 'none';
-                }
-            }
-            
-            if (userData.spotify) {
-                updateSpotifyFromDiscord(userData.spotify);
-            }
-        }
-    }
-    
-    function updateDiscordUIFromLookup(userData) {
-        console.log('🎨 Mise à jour UI Discord avec Lookup:', userData);
-        
-        const avatar = document.getElementById('discord-avatar');
-        const mainAvatar = document.getElementById('main-avatar');
-        const username = document.getElementById('discord-username');
-        const discriminator = document.getElementById('discord-discriminator');
-        const status = document.getElementById('discord-status');
-        const activity = document.getElementById('discord-activity');
-        
-        const avatarUrl = userData.avatar && userData.avatar.link 
-            ? userData.avatar.link
-            : `https://cdn.discordapp.com/embed/avatars/0.png`;
-        
-        if (avatar) avatar.src = avatarUrl;
-        if (mainAvatar) mainAvatar.src = avatarUrl;
-        
-        if (username) username.textContent = userData.username || 'c';
-        if (discriminator) {
-            discriminator.textContent = userData.discriminator 
-                ? `#${userData.discriminator}` 
-                : '';
-        }
-        
-        if (status) status.className = 'status-indicator online';
-        if (activity) activity.innerHTML = '<span class="activity-text">En ligne</span>';
-    }
-    
-    function updateDiscordUIFromAPI(userData) {
-        console.log('🎨 Mise à jour UI Discord avec API:', userData);
-        
-        const avatar = document.getElementById('discord-avatar');
-        const mainAvatar = document.getElementById('main-avatar');
-        const username = document.getElementById('discord-username');
-        const discriminator = document.getElementById('discord-discriminator');
-        
-        const avatarUrl = userData.avatar 
-            ? `https://cdn.discordapp.com/avatars/${userData.id}/${userData.avatar}.png?size=128`
-            : `https://cdn.discordapp.com/embed/avatars/${(parseInt(userData.discriminator) || 0) % 5}.png`;
-        
-        if (avatar) avatar.src = avatarUrl;
-        if (mainAvatar) mainAvatar.src = avatarUrl;
-        
-        if (username) username.textContent = userData.username || 'c';
-        if (discriminator) {
-            discriminator.textContent = userData.discriminator 
-                ? `#${userData.discriminator}` 
-                : '';
-        }
-    }
-    
-    function updateDiscordOffline() {
-        console.log('😴 Mode Discord hors ligne');
-        
-        const avatar = document.getElementById('discord-avatar');
-        const mainAvatar = document.getElementById('main-avatar');
-        const username = document.getElementById('discord-username');
-        const discriminator = document.getElementById('discord-discriminator');
-        const status = document.getElementById('discord-status');
-        const activity = document.getElementById('discord-activity');
-        
-        const defaultAvatar = 'https://cdn.discordapp.com/embed/avatars/0.png';
-        if (avatar) avatar.src = defaultAvatar;
-        if (mainAvatar) mainAvatar.src = defaultAvatar;
-        
-        if (username) username.textContent = 'c';
-        if (discriminator) discriminator.textContent = '';
-        if (status) status.className = 'status-indicator offline';
-        if (activity) activity.innerHTML = '<span class="activity-text">Hors ligne</span>';
-    }
-    
-    function updateSpotifyFromDiscord(spotifyData) {
-        const trackName = document.getElementById('spotify-track');
-        const artistName = document.getElementById('spotify-artist');
-        const albumArt = document.getElementById('spotify-album');
-        
-        if (spotifyData && spotifyData.song) {
-            if (trackName) trackName.textContent = spotifyData.song;
-            if (artistName) artistName.textContent = spotifyData.artist;
-            
-            if (albumArt && spotifyData.album_art_url) {
-                albumArt.src = spotifyData.album_art_url;
-                albumArt.style.display = 'block';
-            }
-        } else {
-            if (trackName) trackName.textContent = 'Rien en cours';
-            if (artistName) artistName.textContent = '-';
-            if (albumArt) albumArt.style.display = 'none';
-        }
-    }
-    
-    async function updateSpotifyStatus() {
-        try {
-            const token = localStorage.getItem('spotify_access_token');
-            
-            if (!token) {
-                return;
-            }
-            
-            const response = await fetch('https://api.spotify.com/v1/me/player/currently-playing', {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-            
-            if (response.ok && response.status !== 204) {
-                const data = await response.json();
-                updateSpotifyUI(data);
-            } else if (response.status === 401) {
-                localStorage.removeItem('spotify_access_token');
-                console.log('Token Spotify expiré');
-            }
-        } catch (error) {
-            console.log('Erreur API Spotify:', error);
-        }
-    }
-    
-    function updateSpotifyUI(data) {
-        const trackName = document.getElementById('spotify-track');
-        const artistName = document.getElementById('spotify-artist');
-        const albumArt = document.getElementById('spotify-album');
-        const albumArtContainer = document.querySelector('.album-art');
-        const spotifyWidget = document.querySelector('.spotify-widget');
-        
-        if (data && data.is_playing && data.item) {
-            if (trackName) trackName.textContent = data.item.name;
-            if (artistName) artistName.textContent = data.item.artists.map(artist => artist.name).join(', ');
-            
-            if (albumArt && data.item.album && data.item.album.images && data.item.album.images.length > 0) {
-                albumArt.src = data.item.album.images[0].url;
-                if (albumArtContainer) albumArtContainer.style.display = 'block';
-            }
-            
-            if (spotifyWidget) spotifyWidget.classList.remove('no-music');
-        } else {
-            if (trackName) trackName.textContent = 'Not playing';
-            if (artistName) artistName.textContent = '';
-            if (albumArtContainer) albumArtContainer.style.display = 'none';
-            
-            if (spotifyWidget) spotifyWidget.classList.add('no-music');
-        }
-    }
+const CONFIG = {
+    DISCORD_USER_ID: '1301658176671715330',
+    SPOTIFY_CLIENT_ID: 'dd3631db64a24da8a1d5bba2ea489a6e',
+    UPDATE_INTERVAL: 30000,
+    SPOTIFY_UPDATE_INTERVAL: 5000
+};
 
-    function updateSpotifyFromDiscord(spotifyData) {
-        const trackName = document.getElementById('spotify-track');
-        const artistName = document.getElementById('spotify-artist');
-        const albumArt = document.getElementById('spotify-album');
-        const albumArtContainer = document.querySelector('.album-art');
-        const spotifyWidget = document.querySelector('.spotify-widget');
+let currentDiscordHandle = '@43cs';
+let lastDiscordUpdate = 0;
+let lastSpotifyUpdate = 0;
+let spotifyProgress = 0;
+let spotifyDuration = 0;
+let spotifyCurrentTime = 0;
+let progressInterval = null;
+let backgroundMusic = null;
+let hasEnteredSite = false;
+let isMuted = false;
+let currentSpotifyData = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    initializeCursor();
+    initializeEntryPage();
+});
+
+function initializeCursor() {
+    const cursor = document.querySelector('.cursor');
+    const cursorDot = document.querySelector('.cursor-dot');
+    const cursorRing = document.querySelector('.cursor-ring');
+    
+    if (!cursor) return;
+    
+    let mouseX = 0;
+    let mouseY = 0;
+    let cursorX = 0;
+    let cursorY = 0;
+    
+    document.addEventListener('mousemove', (e) => {
+        mouseX = e.clientX;
+        mouseY = e.clientY;
+    });
+    
+    function updateCursor() {
+        cursorX += (mouseX - cursorX) * 0.15;
+        cursorY += (mouseY - cursorY) * 0.15;
         
-        if (spotifyData && spotifyData.song) {
-            if (trackName) trackName.textContent = spotifyData.song;
-            if (artistName) artistName.textContent = spotifyData.artist;
+        cursor.style.transform = `translate(${cursorX}px, ${cursorY}px)`;
+        requestAnimationFrame(updateCursor);
+    }
+    updateCursor();
+    
+    const interactiveElements = document.querySelectorAll('a, .avatar, .main-avatar-img, .album-art, .social-link, .entry-text, .audio-control');
+    
+    interactiveElements.forEach(element => {
+        element.addEventListener('mouseenter', () => {
+            cursor.classList.add('hover');
+        });
+        
+        element.addEventListener('mouseleave', () => {
+            cursor.classList.remove('hover');
+        });
+    });
+}
+
+function initializeEntryPage() {
+    const entryPage = document.getElementById('entry-page');
+    const entryButton = document.getElementById('entry-button');
+    const mainSite = document.getElementById('main-site');
+    const audioControl = document.getElementById('audio-control');
+    const audioIcon = document.getElementById('audio-icon');
+    
+    backgroundMusic = document.getElementById('background-music');
+    
+    audioControl.addEventListener('click', function(e) {
+        e.stopPropagation();
+        toggleAudio();
+    });
+    
+    entryButton.addEventListener('click', function() {
+        if (hasEnteredSite) return;
+        hasEnteredSite = true;
+        
+        audioControl.classList.add('visible');
+        
+        if (backgroundMusic && !isMuted) {
+            backgroundMusic.currentTime = 0;
             
-            if (albumArt && spotifyData.album_art_url) {
-                albumArt.src = spotifyData.album_art_url;
-                if (albumArtContainer) albumArtContainer.style.display = 'block';
-            } else {
-                if (albumArtContainer) albumArtContainer.style.display = 'none';
+            const playPromise = backgroundMusic.play();
+            if (playPromise !== undefined) {
+                playPromise.then(() => {
+                    console.log('Musique démarrée avec succès');
+                }).catch(error => {
+                    console.log('Erreur lors du démarrage de la musique:', error);
+                });
             }
-        } else {
-            if (trackName) trackName.textContent = 'Not playing';
-            if (artistName) artistName.textContent = '';
-            if (albumArtContainer) albumArtContainer.style.display = 'none';
             
-            if (spotifyWidget) spotifyWidget.classList.add('no-music');
-        }
-    }
-    
-    function initSpotifyAuth() {
-        const params = new URLSearchParams(window.location.hash.substring(1));
-        const accessToken = params.get('access_token');
-        
-        if (accessToken) {
-            localStorage.setItem('spotify_access_token', accessToken);
-            window.location.hash = '';
-        }
-    }
-    
-    function authenticateSpotify() {
-        const scopes = 'user-read-currently-playing user-read-playback-state';
-        const redirectUri = window.location.origin + window.location.pathname;
-        
-        const authUrl = `https://accounts.spotify.com/authorize?` +
-            `client_id=${CONFIG.SPOTIFY_CLIENT_ID}&` +
-            `response_type=token&` +
-            `redirect_uri=${encodeURIComponent(redirectUri)}&` +
-            `scope=${encodeURIComponent(scopes)}`;
-        
-        window.location.href = authUrl;
-    }
-    
-    const discordLink = document.querySelector('.discord-link');
-    if (discordLink) {
-        discordLink.addEventListener('click', (e) => {
-            e.preventDefault();
-            const usernameElement = document.getElementById('discord-username');
-            const currentUsername = usernameElement ? usernameElement.textContent : '@c';
-            
-            navigator.clipboard.writeText(currentUsername).then(() => {
-                showNotification(`Nom Discord copié : ${currentUsername}`);
-            }).catch(() => {
-                showNotification('Erreur lors de la copie');
+            backgroundMusic.addEventListener('ended', function() {
+                if (!isMuted) {
+                    this.currentTime = 0;
+                    this.play();
+                }
             });
-        });
-    }
-    const spotifyLink = document.querySelector('.spotify-link');
-    if (spotifyLink) {
-        spotifyLink.addEventListener('click', (e) => {
-            e.preventDefault();
-            if (!localStorage.getItem('spotify_access_token')) {
-                authenticateSpotify();
-            } else {
-                window.open('https://open.spotify.com/', '_blank');
-            }
-        });
-    }
-    
-    function showNotification(message) {
-        const notification = document.createElement('div');
-        notification.style.cssText = `
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            background: rgba(0, 0, 0, 0.9);
-            color: #e1e8ed;
-            padding: 12px 20px;
-            border-radius: 8px;
-            border: 1px solid #2c3e50;
-            backdrop-filter: blur(20px);
-            z-index: 10000;
-            font-size: 14px;
-            animation: slideInRight 0.3s ease;
-        `;
-        notification.textContent = message;
-        document.body.appendChild(notification);
+        }
+        
+        entryPage.classList.add('fade-out');
         
         setTimeout(() => {
-            notification.style.animation = 'slideOutRight 0.3s ease';
-            setTimeout(() => notification.remove(), 300);
-        }, 3000);
-    }
-    
-    function updateLastSeen() {
-        const lastSeenElement = document.getElementById('last-seen');
-        if (lastSeenElement) {
-            const now = new Date();
-            const timeString = now.toLocaleTimeString('fr-FR', {
-                hour: '2-digit',
-                minute: '2-digit'
-            });
-            lastSeenElement.textContent = `Vu pour la dernière fois: ${timeString}`;
-        }
-    }
-    
-    function createExtraSnow() {
-        const snowContainer = document.querySelector('.snow-container');
-        if (snowContainer) {
-            for (let i = 0; i < 20; i++) {
-                const snowflake = document.createElement('div');
-                snowflake.className = 'snow';
-                snowflake.style.left = Math.random() * 100 + '%';
-                snowflake.style.animationDuration = (Math.random() * 10 + 5) + 's';
-                snowflake.style.animationDelay = Math.random() * 5 + 's';
-                snowflake.style.width = snowflake.style.height = (Math.random() * 3 + 1) + 'px';
-                snowContainer.appendChild(snowflake);
+            entryPage.style.display = 'none';
+            mainSite.style.display = 'block';
+            
+            initializeMainSite();
+        }, 800);
+    });
+
+    function toggleAudio() {
+        const audioControl = document.getElementById('audio-control');
+        const audioIcon = document.getElementById('audio-icon');
+        
+        isMuted = !isMuted;
+        
+        if (isMuted) {
+            if (backgroundMusic) {
+                backgroundMusic.pause();
             }
+            audioIcon.className = 'fas fa-volume-mute';
+            audioControl.classList.add('muted');
+            console.log('Musique coupée');
+        } else {
+            if (backgroundMusic && hasEnteredSite) {
+                const playPromise = backgroundMusic.play();
+                if (playPromise !== undefined) {
+                    playPromise.then(() => {
+                        console.log('Musique remise');
+                    }).catch(error => {
+                        console.log('Erreur lors de la remise de la musique:', error);
+                    });
+                }
+            }
+            audioIcon.className = 'fas fa-volume-up';
+            audioControl.classList.remove('muted');
         }
     }
-    
-    console.log('❄️ Initialisation du thème winter...');
-    
-    initSpotifyAuth();
+}
+
+function initializeMainSite() {
+    initializeTypingEffect();
+    initializeLastSeen();
     updateDiscordStatus();
     updateSpotifyStatus();
-    updateLastSeen();
-    createExtraSnow();
     
     setInterval(updateDiscordStatus, CONFIG.UPDATE_INTERVAL);
     setInterval(updateSpotifyStatus, CONFIG.SPOTIFY_UPDATE_INTERVAL);
     setInterval(updateLastSeen, 60000);
     
-    console.log('✅ Thème winter chargé avec succès!');
+    setInterval(updateSpotifyProgress, 1000);
+}
+
+function initializeTypingEffect() {
+    const typingText = document.querySelector('.typing-text');
+    if (!typingText) return;
+    
+    const texts = [
+        'made by @cenfoire',
+        'creative developer',
+        'digital minimalist',
+        'code architect',
+        'pixel perfectionist'
+    ];
+    
+    let textIndex = 0;
+    let charIndex = 0;
+    let isDeleting = false;
+    
+    function typeWriter() {
+        const currentText = texts[textIndex];
+        
+        if (isDeleting) {
+            typingText.textContent = currentText.substring(0, charIndex - 1);
+            charIndex--;
+        } else {
+            typingText.textContent = currentText.substring(0, charIndex + 1);
+            charIndex++;
+        }
+        
+        let typeSpeed = isDeleting ? 50 : 100;
+        
+        if (!isDeleting && charIndex === currentText.length) {
+            typeSpeed = 2000;
+            isDeleting = true;
+        } else if (isDeleting && charIndex === 0) {
+            isDeleting = false;
+            textIndex = (textIndex + 1) % texts.length;
+            typeSpeed = 500;
+        }
+        
+        setTimeout(typeWriter, typeSpeed);
+    }
+    
+    typeWriter();
+}
+
+function initializeLastSeen() {
+    updateLastSeen();
+}
+
+function updateLastSeen() {
+    const lastSeenElement = document.getElementById('last-seen');
+    if (!lastSeenElement) return;
+    
+    const now = new Date();
+    const timeString = now.toLocaleTimeString('fr-FR', {
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+    
+    lastSeenElement.textContent = `Last seen: ${timeString}`;
+}
+
+async function updateDiscordStatus() {
+    try {
+        const response = await fetch(`https://api.lanyard.rest/v1/users/${CONFIG.DISCORD_USER_ID}`);
+        const data = await response.json();
+        
+        if (data.success && data.data) {
+            const user = data.data;
+            updateDiscordUI(user);
+        }
+    } catch (error) {
+        console.log('Erreur lors de la récupération des données Discord:', error);
+    }
+}
+
+function updateDiscordUI(userData) {
+    const avatar = document.getElementById('discord-avatar');
+    const username = document.getElementById('discord-username');
+    const activity = document.getElementById('discord-activity');
+    const statusDot = document.getElementById('discord-status-dot');
+    const statusBadge = document.getElementById('discord-status');
+    const mainAvatar = document.getElementById('main-avatar');
+    const mainStatusDot = document.getElementById('main-status-dot');
+    const mainStatusText = document.getElementById('main-status-text');
+    
+    if (avatar && userData.discord_user) {
+        const avatarUrl = userData.discord_user.avatar 
+            ? `https://cdn.discordapp.com/avatars/${userData.discord_user.id}/${userData.discord_user.avatar}.png?size=128`
+            : `https://cdn.discordapp.com/embed/avatars/${userData.discord_user.discriminator % 5}.png`;
+        
+        avatar.src = avatarUrl;
+        if (mainAvatar) mainAvatar.src = avatarUrl;
+    }
+    
+    if (username && userData.discord_user) {
+        username.textContent = userData.discord_user.global_name || userData.discord_user.username;
+    }
+    
+    const status = userData.discord_status || 'offline';
+    if (statusDot) {
+        statusDot.className = `status-indicator ${status}`;
+    }
+    if (statusBadge) {
+        statusBadge.className = `status-badge ${status}`;
+    }
+    
+    if (mainStatusDot) {
+        mainStatusDot.className = `status-dot ${status}`;
+    }
+    
+    const statusTexts = {
+        'online': 'En ligne - Disponible pour des projets',
+        'idle': 'Absent - Répondra plus tard',
+        'dnd': 'Ne pas déranger - Occupé',
+        'offline': 'Hors ligne - Laissez un message'
+    };
+    
+    if (mainStatusText) {
+        mainStatusText.textContent = statusTexts[status] || 'Statut inconnu';
+    }
+    
+    if (activity) {
+        const activityText = activity.querySelector('.activity-text');
+        if (userData.activities && userData.activities.length > 0) {
+            const customStatus = userData.activities.find(act => act.type === 4);
+            if (customStatus) {
+                const emoji = customStatus.emoji ? `${customStatus.emoji.name} ` : '';
+                const state = customStatus.state || '';
+                activityText.textContent = `${emoji}${state}`.trim() || 'Custom Status';
+            } else {
+                const currentActivity = userData.activities[0];
+                if (currentActivity.type === 0) { 
+                    activityText.textContent = `Playing ${currentActivity.name}`;
+                } else if (currentActivity.type === 2) { 
+                    activityText.textContent = `Listening to ${currentActivity.name}`;
+                } else if (currentActivity.type === 3) { 
+                    activityText.textContent = `Watching ${currentActivity.name}`;
+                } else {
+                    activityText.textContent = currentActivity.name;
+                }
+            }
+        } else {
+            const activityStatusTexts = {
+                'online': 'Online',
+                'idle': 'Away',
+                'dnd': 'Do Not Disturb',
+                'offline': 'Offline'
+            };
+            activityText.textContent = activityStatusTexts[status] || 'Offline';
+        }
+    }
+}
+
+async function updateSpotifyStatus() {
+    try {
+        const response = await fetch(`https://api.lanyard.rest/v1/users/${CONFIG.DISCORD_USER_ID}`);
+        const data = await response.json();
+        
+        if (data.success && data.data && data.data.spotify) {
+            updateSpotifyUI(data.data.spotify);
+        } else {
+            updateSpotifyUI(null);
+        }
+    } catch (error) {
+        console.log('Erreur lors de la récupération des données Spotify:', error);
+        updateSpotifyUI(null);
+    }
+}
+
+function updateSpotifyProgress() {
+    if (!currentSpotifyData) return;
+    
+    const progressFill = document.getElementById('spotify-progress');
+    const currentTimeElement = document.getElementById('current-time');
+    const totalTimeElement = document.getElementById('total-time');
+    
+    const progress = ((Date.now() - currentSpotifyData.timestamps.start) / (currentSpotifyData.timestamps.end - currentSpotifyData.timestamps.start)) * 100;
+    const clampedProgress = Math.min(Math.max(progress, 0), 100);
+    
+    if (progressFill) {
+        progressFill.style.width = `${clampedProgress}%`;
+    }
+    
+    const currentMs = Date.now() - currentSpotifyData.timestamps.start;
+    const totalMs = currentSpotifyData.timestamps.end - currentSpotifyData.timestamps.start;
+    
+    if (currentTimeElement) {
+        currentTimeElement.textContent = formatTime(Math.max(0, currentMs));
+    }
+    if (totalTimeElement) {
+        totalTimeElement.textContent = formatTime(totalMs);
+    }
+}
+
+function updateSpotifyUI(spotifyData) {
+    const trackElement = document.getElementById('spotify-track');
+    const artistElement = document.getElementById('spotify-artist');
+    const albumElement = document.getElementById('spotify-album');
+    const albumContainer = document.querySelector('.album-container');
+    const playingIndicator = document.getElementById('spotify-playing');
+    const progressContainer = document.getElementById('spotify-progress-container');
+    
+    currentSpotifyData = spotifyData;
+    
+    if (spotifyData) {
+        if (trackElement) trackElement.textContent = spotifyData.song;
+        if (artistElement) artistElement.textContent = spotifyData.artist;
+        if (albumElement) {
+            albumElement.src = spotifyData.album_art_url;
+            albumElement.classList.add('visible');
+        }
+        if (albumContainer) {
+            albumContainer.classList.remove('hidden');
+        }
+        
+        if (playingIndicator) {
+            playingIndicator.classList.add('playing');
+        }
+        
+        if (progressContainer) {
+            progressContainer.classList.add('visible');
+        }
+        
+        updateSpotifyProgress();
+    } else {
+        if (trackElement) trackElement.textContent = 'Not playing';
+        if (artistElement) artistElement.textContent = '-';
+        if (albumElement) {
+            albumElement.src = '';
+            albumElement.classList.remove('visible'); 
+        }
+        if (albumContainer) {
+            albumContainer.classList.add('hidden');
+        }
+        if (playingIndicator) {
+            playingIndicator.classList.remove('playing');
+        }
+        if (progressContainer) {
+            progressContainer.classList.remove('visible');
+        }
+    }
+}
+
+function formatTime(ms) {
+    const seconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+}
+
+function showNotification(title, message, type = 'success', duration = 3000) {
+    const existingNotifications = document.querySelectorAll('.notification');
+    existingNotifications.forEach(notif => notif.remove());
+    
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    
+    const icon = type === 'success' ? 'fas fa-check-circle' : 'fas fa-exclamation-circle';
+    
+    notification.innerHTML = `
+        <div class="notification-icon">
+            <i class="${icon}"></i>
+        </div>
+        <div class="notification-content">
+            <div class="notification-title">${title}</div>
+            <div class="notification-message">${message}</div>
+        </div>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        notification.classList.add('show');
+    }, 10);
+    
+    setTimeout(() => {
+        notification.classList.remove('show');
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.remove();
+            }
+        }, 300);
+    }, duration);
+}
+
+async function copyToClipboard(text) {
+    try {
+        if (navigator.clipboard && window.isSecureContext) {
+            await navigator.clipboard.writeText(text);
+            return true;
+        } else {
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
+            textArea.style.position = 'fixed';
+            textArea.style.left = '-999999px';
+            textArea.style.top = '-999999px';
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            
+            const result = document.execCommand('copy');
+            textArea.remove();
+            return result;
+        }
+    } catch (err) {
+        console.error('Erreur lors de la copie:', err);
+        return false;
+    }
+}
+
+function initializeSocialLinks() {
+    const socialLinks = document.querySelectorAll('.social-link');
+    
+    socialLinks.forEach(link => {
+        link.addEventListener('click', async (e) => {
+            e.preventDefault();
+            
+            const linkUrl = link.getAttribute('data-link');
+            const platform = link.getAttribute('data-platform');
+            
+            if (!linkUrl) {
+                showNotification(
+                    'Erreur',
+                    'Aucun lien configuré pour cette plateforme',
+                    'error'
+                );
+                return;
+            }
+            
+            link.classList.add('copying');
+            setTimeout(() => {
+                link.classList.remove('copying');
+            }, 150);
+            
+            const success = await copyToClipboard(linkUrl);
+            
+            if (success) {
+                showNotification(
+                    `${platform} copié !`,
+                    `Le lien a été copié dans votre presse-papiers`,
+                    'success'
+                );
+            } else {
+                showNotification(
+                    'Erreur de copie',
+                    'Impossible de copier le lien automatiquement',
+                    'error'
+                );
+            }
+        });
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    initializeCursor();
+    initializeEntryPage();
+    initializeSocialLinks();
 });
