@@ -1,6 +1,6 @@
 const CONFIG = {
     DISCORD_USER_ID: '1301658176671715330',
-    SPOTIFY_CLIENT_ID: 'dd3631db64a24da8a1d5bba2ea489a6e',
+    SPOTIFY_CLIENT_ID: '0efa2ff970034c54be656cd533865209',
     UPDATE_INTERVAL: 30000,
     SPOTIFY_UPDATE_INTERVAL: 5000
 };
@@ -16,6 +16,18 @@ let backgroundMusic = null;
 let hasEnteredSite = false;
 let isMuted = false;
 let currentSpotifyData = null;
+
+function copyDiscordUsername() {
+    const username = '43cs';
+    navigator.clipboard.writeText(username).then(() => {
+        const usernameEl = document.getElementById('discord-username');
+        const originalText = usernameEl.textContent;
+        usernameEl.textContent = 'Copied!';
+        setTimeout(() => {
+            usernameEl.textContent = originalText;
+        }, 1000);
+    });
+}
 
 document.addEventListener('DOMContentLoaded', function() {
     initializeCursor();
@@ -241,8 +253,8 @@ function updateDiscordUI(userData) {
     
     if (avatar && userData.discord_user) {
         const avatarUrl = userData.discord_user.avatar 
-            ? `https://cdn.discordapp.com/avatars/${userData.discord_user.id}/${userData.discord_user.avatar}.png?size=128`
-            : `https://cdn.discordapp.com/embed/avatars/${userData.discord_user.discriminator % 5}.png`;
+            ? `https://cdn.discordapp.com/avatars/${userData.discord_user.id}/${userData.discord_user.avatar}?size=128`
+            : `https://cdn.discordapp.com/embed/avatars/0.png`;
         
         avatar.src = avatarUrl;
         if (mainAvatar) mainAvatar.src = avatarUrl;
