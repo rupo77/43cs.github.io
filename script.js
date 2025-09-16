@@ -504,7 +504,7 @@ async function copyToClipboard(text) {
             return result;
         }
     } catch (err) {
-        console.error('Erreur lors de la copie:', err);
+        console.error('error beim kopieren:', err);
         return false;
     }
 }
@@ -522,7 +522,7 @@ function initializeSocialLinks() {
             if (!linkUrl) {
                 showNotification(
                     'Erreur',
-                    'Aucun lien configuré pour cette plateforme',
+                    'error',
                     'error'
                 );
                 return;
@@ -537,14 +537,14 @@ function initializeSocialLinks() {
             
             if (success) {
                 showNotification(
-                    `${platform} copié !`,
-                    `Le lien a été copié dans votre presse-papiers`,
+                    `${platform} kopiert !`,
+                    `koppiert`,
                     'success'
                 );
             } else {
                 showNotification(
-                    'Erreur de copie',
-                    'Impossible de copier le lien automatiquement',
+                    'error beim kopieren?',
+                    'error???',
                     'error'
                 );
             }
