@@ -173,7 +173,7 @@ function initializeTypingEffect() {
     
     const texts = [
         'made by @43cs',
-        'not socreative developer',
+        'not so creative developer',
         'minimalist',
         'c++ programmer',
         'a chill guy'
