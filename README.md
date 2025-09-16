@@ -9,6 +9,8 @@ A modern personal profile website with Discord and Spotify integrations.
 - Spotify "Now Playing" widget
 - Visual effects (snow, fog)
 - Custom cursor
-- Dark theme with ice-blue accents
+
 
 ## Complete Setup Guide
+
+- dont be retarded
