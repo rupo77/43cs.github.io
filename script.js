@@ -363,7 +363,7 @@ async function updateSpotifyStatus() {
             updateSpotifyUI(null);
         }
     } catch (error) {
-        console.log('Erreur lors de la récupération des données Spotify:', error);
+        console.log('spotify error?:', error);
         updateSpotifyUI(null);
     }
 }
