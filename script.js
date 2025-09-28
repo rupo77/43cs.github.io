@@ -29,11 +29,6 @@ function copyDiscordUsername() {
     });
 }
 
-document.addEventListener('DOMContentLoaded', function() {
-    initializeCursor();
-    initializeEntryPage();
-});
-
 function initializeCursor() {
     const cursor = document.querySelector('.cursor');
     const cursorDot = document.querySelector('.cursor-dot');
